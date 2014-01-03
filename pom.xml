@@ -95,6 +95,7 @@
     <module>mc-core</module>
     <module>mc-util</module>
     <module>mc-net</module>
+    <module>mc-broker</module>
     <module>distribution</module>
   </modules>
 </project>
