@@ -16,6 +16,8 @@ package net.maritimecloud.util.geometry;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.Random;
+
 /**
  * A circle
  * 
@@ -133,5 +135,72 @@ public class Circle extends Area {
      */
     public Circle withRadius(double radius) {
         return new Circle(center, radius, cs);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Position getRandomPosition(Random r) {
+        BoundingBox bb = getBoundingBox();
+        for (int i = 0; i < 10000; i++) {
+            Position p = bb.getRandomPosition(r);
+            if (contains(p)) {
+                return p;
+            }
+        }
+        throw new RuntimeException("Inifinite loop");
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public BoundingBox getBoundingBox() {
+        double right = cs.pointOnBearing(center, radius, 0).latitude;
+        double left = cs.pointOnBearing(center, radius, 180).latitude;
+        double top = cs.pointOnBearing(center, radius, 90).longitude;
+        double buttom = cs.pointOnBearing(center, radius, 270).longitude;
+        Position topLeft = Position.create(left, top);
+        Position buttomRight = Position.create(right, buttom);
+        return BoundingBox.create(topLeft, buttomRight, cs);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean intersects(Area other) {
+        if (other instanceof Circle) {
+            return intersects((Circle) other);
+        } else if (other instanceof BoundingBox) {
+            return intersects((BoundingBox) other);
+        } else {
+            throw new UnsupportedOperationException("Only circles and BoundingBoxes supported");
+        }
+    }
+
+    public boolean intersects(BoundingBox other) {
+        return other.intersects(this);
+    }
+
+    public boolean intersects(Line line) {
+        return intersects(line.getStart(), line.getEnd());
+    }
+
+    boolean intersects(Position p1, Position p2) {
+        double baX = p2.getLongitude() - p1.getLongitude();
+        double baY = p2.getLatitude() - p1.getLatitude();
+        double caX = center.getLongitude() - p2.getLongitude();
+        double caY = center.getLatitude() - p2.getLatitude();
+
+        double a = baX * baX + baY * baY;
+        double bBy2 = baX * caX + baY * caY;
+        double c = caX * caX + caY * caY - radius * radius;
+
+        double pBy2 = bBy2 / a;
+        double q = c / a;
+
+        double disc = pBy2 * pBy2 - q;
+        return disc >= 0;
+    }
+
+    public boolean intersects(Circle other) {
+        double centerDistance = getCoordinateSystem().distanceBetween(center, other.center);
+        return radius + other.radius >= centerDistance;
     }
 }

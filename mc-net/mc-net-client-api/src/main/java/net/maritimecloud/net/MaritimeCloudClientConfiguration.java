@@ -26,6 +26,10 @@ import net.maritimecloud.core.id.MaritimeId;
 import net.maritimecloud.net.broadcast.BroadcastOptions;
 import net.maritimecloud.util.function.Consumer;
 import net.maritimecloud.util.function.Supplier;
+import net.maritimecloud.util.geometry.Circle;
+import net.maritimecloud.util.geometry.CoordinateSystem;
+import net.maritimecloud.util.geometry.PositionReader;
+import net.maritimecloud.util.geometry.PositionReaderSimulator;
 import net.maritimecloud.util.geometry.PositionTime;
 
 /**
@@ -48,14 +52,25 @@ public class MaritimeCloudClientConfiguration {
 
     private String nodes = "localhost:43234";
 
-    private Supplier<PositionTime> positionSupplier = new Supplier<PositionTime>() {
-        public PositionTime get() {
-            return PositionTime.create(0, 0, 0);
-        }
-    };
+    private PositionReader positionReader = new PositionReaderSimulator().forArea(new Circle(0, 0, 50000,
+            CoordinateSystem.CARTESIAN));
 
     MaritimeCloudClientConfiguration(MaritimeId id) {
         this.id = id;
+        String p = System.getProperty("maritimecloud.printmessages");
+        if ("true".equalsIgnoreCase(p)) {
+            addListener(new MaritimeCloudConnection.Listener() {
+                @Override
+                public void messageReceived(String message) {
+                    System.out.println("Received:" + message);
+                }
+
+                @Override
+                public void messageSend(String message) {
+                    System.out.println("Sending :" + message);
+                }
+            });
+        }
     }
 
     /**
@@ -149,8 +164,8 @@ public class MaritimeCloudClientConfiguration {
     /**
      * @return the positionSupplier
      */
-    public Supplier<PositionTime> getPositionSupplier() {
-        return positionSupplier;
+    public PositionReader getPositionReader() {
+        return positionReader;
     }
 
     /**
@@ -192,9 +207,24 @@ public class MaritimeCloudClientConfiguration {
         return this;
     }
 
-    public MaritimeCloudClientConfiguration setPositionSupplier(Supplier<PositionTime> positionSupplier) {
-        this.positionSupplier = requireNonNull(positionSupplier);
+    public MaritimeCloudClientConfiguration setPositionReader(PositionReader positionReader) {
+        this.positionReader = requireNonNull(positionReader);
         return this;
+    }
+
+    /**
+     * @deprecated use {@link #setPositionReader(PositionReader)}
+     */
+    @Deprecated
+    public MaritimeCloudClientConfiguration setPositionSupplier(final Supplier<PositionTime> positionSupplier) {
+        requireNonNull(positionSupplier);
+        return setPositionReader(new PositionReader() {
+
+            @Override
+            public PositionTime getCurrentPosition() {
+                return positionSupplier.get();
+            }
+        });
     }
 
     public static MaritimeCloudClientConfiguration create() {
@@ -207,5 +237,77 @@ public class MaritimeCloudClientConfiguration {
 
     public static MaritimeCloudClientConfiguration create(String id) {
         return new MaritimeCloudClientConfiguration(MaritimeId.create(id));
+    }
+
+    final Properties properties = new Properties();
+
+    public Properties properties() {
+        return properties;
+    }
+
+    public static class Properties {
+        private String description;
+
+        private String name;
+
+        private String organization;
+
+        /**
+         * @return the description
+         */
+        public String getDescription() {
+            return description;
+        }
+
+        /**
+         * @return the name
+         */
+        public String getName() {
+            return name;
+        }
+
+        /**
+         * @return the organization
+         */
+        public String getOrganization() {
+            return organization;
+        }
+
+        /**
+         * @param description
+         *            the description to set
+         * @return
+         */
+        public Properties setDescription(String description) {
+            this.description = checkComma(description);
+            return this;
+        }
+
+        /**
+         * @param name
+         *            the name to set
+         */
+        public Properties setName(String name) {
+            this.name = checkComma(name);
+            return this;
+        }
+
+        /**
+         * @param organization
+         *            the organization to set
+         * @return
+         */
+        public Properties setOrganization(String organization) {
+            this.organization = checkComma(organization);
+            return this;
+        }
+
+        private static String checkComma(String comma) {
+            if (comma != null && comma.contains(",")) {
+                throw new IllegalArgumentException(
+                        "Sorry cannot use ',' at the moment it is used as an internal separator, was " + comma);
+            }
+            return comma;
+        }
     }
 }

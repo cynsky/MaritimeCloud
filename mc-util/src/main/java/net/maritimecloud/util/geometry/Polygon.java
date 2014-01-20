@@ -14,7 +14,7 @@
  */
 package net.maritimecloud.util.geometry;
 
-public class Polygon extends Area {
+public abstract class Polygon extends Area {
     /** serialVersionUID. */
     private static final long serialVersionUID = 1L;
 

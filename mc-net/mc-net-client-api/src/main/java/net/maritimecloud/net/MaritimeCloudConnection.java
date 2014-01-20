@@ -14,6 +14,7 @@
  */
 package net.maritimecloud.net;
 
+import java.net.URI;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -23,10 +24,34 @@ import java.util.concurrent.TimeUnit;
  */
 public interface MaritimeCloudConnection {
 
-    void addListener(Listener listener);
-
+    /**
+     * Blocks until there is a valid connection to the maritime cloud, or the client is closed, or the timeout occurs,
+     * or the current thread is interrupted, whichever happens first.
+     * 
+     * @param timeout
+     *            the maximum time to wait
+     * @param unit
+     *            the time unit of the timeout argument
+     * @return <tt>true</tt> if the connection is connected and <tt>false</tt> if the timeout elapsed before a
+     *         connection was made or the client was closed
+     * @throws InterruptedException
+     *             if interrupted while waiting
+     */
     boolean awaitConnected(long timeout, TimeUnit unit) throws InterruptedException;
 
+    /**
+     * Blocks until there is a valid connection to the maritime cloud, or the client is closed, or the timeout occurs,
+     * or the current thread is interrupted, whichever happens first.
+     * 
+     * @param timeout
+     *            the maximum time to wait
+     * @param unit
+     *            the time unit of the timeout argument
+     * @return <tt>true</tt> if the connection is connected and <tt>false</tt> if the timeout elapsed before a
+     *         connection was made or the client was closed
+     * @throws InterruptedException
+     *             if interrupted while waiting
+     */
     boolean awaitDisconnected(long timeout, TimeUnit unit) throws InterruptedException;
 
     /**
@@ -43,21 +68,37 @@ public interface MaritimeCloudConnection {
      */
     void disconnect();
 
-    // /**
-    // * Returns an unique connection id after the connection has been made. Returns <code>null</code> until connected.
-    // *
-    // * @return an unique connection id
-    // */
-    // String getId();
-
+    /**
+     * Returns whether or not we are currently connected to the cloud.
+     * 
+     * @return whether or not we are currently connected to the cloud
+     */
     boolean isConnected();
 
     /** A listener that can used to listen for updates to the connection status to the maritime network. */
     abstract class Listener {
 
+        /**
+         * Invoked whenever the client is trying to connect/reconnect.
+         * 
+         * @param host
+         *            The host we are connecting to
+         */
+        public void connecting(URI host) {}
+
         /** Invoked when the client has fully connected to the server. */
         public void connected() {}
 
+        public void messageReceived(String message) {}
+
+        public void messageSend(String message) {}
+
+        /**
+         * Invoked when the client has been disconnected from the cloud server
+         * 
+         * @param closeReason
+         *            the reason for the closing
+         */
         public void disconnected(ClosingCode closeReason) {}
     }
 }

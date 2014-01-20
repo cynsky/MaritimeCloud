@@ -20,11 +20,16 @@ import java.util.LinkedList;
 
 import net.maritimecloud.internal.net.messages.ConnectionMessage;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * 
  * @author Kasper Nielsen
  */
 public class WorkerInner {
+    /** The logger. */
+    static final Logger LOG = LoggerFactory.getLogger(WorkerInner.class);
 
     private boolean nextIsReceived /* = false */;
 
@@ -46,9 +51,9 @@ public class WorkerInner {
         this.worker = requireNonNull(worker);
     }
 
-    ClientTransport transport;
+    ConnectionTransport transport;
 
-    public void onConnect(ClientTransport transport, long id, boolean isReconnected) {
+    public void onConnect(ConnectionTransport transport, long id, boolean isReconnected) {
         LinkedList<Long> idsToResend = new LinkedList<>();
         while (!written.isEmpty()) {
             OutstandingMessage om = written.pollLast();
@@ -62,7 +67,7 @@ public class WorkerInner {
             if (!unwritten.isEmpty()) {}
         }
         if (idsToResend.size() > 0) {
-            System.out.println("Resending messages with id(s): " + idsToResend);
+            LOG.debug("Resending messages with id(s): " + idsToResend);
         }
         this.transport = transport;
         while (processNext()) {}
@@ -120,7 +125,7 @@ public class WorkerInner {
     }
 
     private void processWritten() {
-        ClientTransport transport = worker.connection.getTransport();
+        ConnectionTransport transport = worker.connection.getTransport();
         if (transport != null && transport == this.transport) {
             OutstandingMessage om = unwritten.poll();
             ConnectionMessage cm = om.cm;

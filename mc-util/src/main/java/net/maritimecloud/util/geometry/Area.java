@@ -15,6 +15,10 @@
 package net.maritimecloud.util.geometry;
 
 import static java.util.Objects.requireNonNull;
+
+import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
+
 import net.maritimecloud.util.function.Predicate;
 
 /**
@@ -30,6 +34,22 @@ public abstract class Area implements Element {
         this.cs = requireNonNull(cs);
     }
 
+    static double nextDouble(Random r, double least, double bound) {
+        return r.nextDouble() * (bound - least) + least;
+    }
+
+    /**
+     * Returns a random position within the area.
+     * 
+     * @return a random position within the area
+     */
+    public final Position getRandomPosition() {
+        return getRandomPosition(ThreadLocalRandom.current());
+    }
+
+    public abstract Position getRandomPosition(Random random);
+
+
     public final Predicate<Element> contains() {
         return new Predicate<Element>() {
             public boolean test(Element element) {
@@ -37,6 +57,13 @@ public abstract class Area implements Element {
             }
         };
     }
+
+    /**
+     * Returns a bounding box of the area.
+     * 
+     * @return a bounding box of the area
+     */
+    public abstract BoundingBox getBoundingBox();
 
     /**
      * Returns <tt>true</tt> if the specified element is fully contained in the shape, otherwise <tt>false</tt>.
@@ -48,6 +75,8 @@ public abstract class Area implements Element {
     public boolean contains(Element element) {
         throw new UnsupportedOperationException();
     }
+
+    public abstract boolean intersects(Area other);
 
     @Override
     public final double distanceTo(Element other, CoordinateSystem system) {

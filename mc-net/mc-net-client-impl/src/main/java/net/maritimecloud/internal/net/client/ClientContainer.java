@@ -24,11 +24,12 @@ import net.maritimecloud.core.id.MaritimeId;
 import net.maritimecloud.internal.net.client.broadcast.BroadcastManager;
 import net.maritimecloud.internal.net.client.connection.ConnectionManager;
 import net.maritimecloud.internal.net.client.connection.ConnectionMessageBus;
+import net.maritimecloud.internal.net.client.connection.ConnectionTransportManager;
 import net.maritimecloud.internal.net.client.service.ClientServiceManager;
 import net.maritimecloud.internal.net.client.service.PositionManager;
 import net.maritimecloud.internal.net.client.util.ThreadManager;
 import net.maritimecloud.net.MaritimeCloudClientConfiguration;
-import net.maritimecloud.util.function.Supplier;
+import net.maritimecloud.util.geometry.PositionReader;
 import net.maritimecloud.util.geometry.PositionTime;
 
 import org.picocontainer.DefaultPicoContainer;
@@ -56,6 +57,8 @@ public class ClientContainer extends ReentrantLock {
     /** The container has been fully terminated. */
     static final int S_TERMINATED = 3;
 
+    private final String clientConnectString;
+
     /** The id of this client */
     private final MaritimeId clientId;
 
@@ -63,7 +66,7 @@ public class ClientContainer extends ReentrantLock {
     private final DefaultPicoContainer picoContainer = new DefaultPicoContainer(new Caching());
 
     /** Supplies the current position. */
-    private final Supplier<PositionTime> positionSupplier;
+    private final PositionReader positionSupplier;
 
     /** The current state of the client. Only set while holding lock, can be read at any time. */
     private volatile int state /* = 0 */;
@@ -71,17 +74,19 @@ public class ClientContainer extends ReentrantLock {
     /** A latch that is released when the client has been terminated. */
     private final CountDownLatch terminated = new CountDownLatch(1);
 
+    private final ThreadManager threadManager;
+
     /**
      * Creates a new instance of this class.
      * 
-     * @param builder
+     * @param configuration
      *            the configuration
      */
-    ClientContainer(MaritimeCloudClientConfiguration builder) {
-        clientId = requireNonNull(builder.getId());
-        positionSupplier = requireNonNull(builder.getPositionSupplier());
+    ClientContainer(MaritimeCloudClientConfiguration configuration) {
+        clientId = requireNonNull(configuration.getId());
+        positionSupplier = requireNonNull(configuration.getPositionReader());
 
-        picoContainer.addComponent(builder);
+        picoContainer.addComponent(configuration);
         picoContainer.addComponent(this);
         picoContainer.addComponent(PositionManager.class);
         picoContainer.addComponent(BroadcastManager.class);
@@ -89,8 +94,22 @@ public class ClientContainer extends ReentrantLock {
         picoContainer.addComponent(ConnectionMessageBus.class);
         picoContainer.addComponent(ThreadManager.class);
         picoContainer.addComponent(ConnectionManager.class);
+        picoContainer.addComponent(ConnectionTransportManager.create());
 
         picoContainer.addComponent(new ImmutablePicoContainer(picoContainer));
+        threadManager = picoContainer.getComponent(ThreadManager.class);
+
+        String s = "version=0.1";
+        if (configuration.properties().getName() != null) {
+            s += ",name=" + configuration.properties().getName();
+        }
+        if (configuration.properties().getDescription() != null) {
+            s += ",description=" + configuration.properties().getDescription();
+        }
+        if (configuration.properties().getOrganization() != null) {
+            s += ",organization=" + configuration.properties().getOrganization();
+        }
+        clientConnectString = s;
     }
 
     public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
@@ -102,13 +121,11 @@ public class ClientContainer extends ReentrantLock {
         try {
             if (state < S_SHUTDOWN) {
                 state = S_SHUTDOWN;
-                Runnable r = new Runnable() {
-
+                threadManager.startCloseThread(new Runnable() {
                     public void run() {
                         close0();
                     }
-                };
-                new Thread(r).start();
+                });
             }
         } finally {
             unlock();
@@ -116,23 +133,28 @@ public class ClientContainer extends ReentrantLock {
     }
 
     void close0() {
-        lock();
         try {
-            if (state == S_SHUTDOWN) {
-                try {
-                    picoContainer.stop();
-                } finally {
-                    state = S_TERMINATED;
-                    terminated.countDown();
-                }
-            }
+            picoContainer.stop();
         } finally {
-            unlock();
+            lock();
+            try {
+                state = S_TERMINATED;
+                terminated.countDown();
+            } finally {
+                unlock();
+            }
         }
     }
 
     protected void finalize() {
         close();
+    }
+
+    /**
+     * @return the clientConnectString
+     */
+    public String getClientConnectString() {
+        return clientConnectString;
     }
 
     /**
@@ -165,7 +187,7 @@ public class ClientContainer extends ReentrantLock {
      * @return the current position
      */
     public PositionTime readCurrentPosition() {
-        return positionSupplier.get();
+        return positionSupplier.getCurrentPosition();
     }
 
     static PicoContainer create(MaritimeCloudClientConfiguration builder) {

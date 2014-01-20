@@ -27,6 +27,7 @@ import net.maritimecloud.internal.net.client.ClientContainer;
 import net.maritimecloud.internal.net.client.util.ThreadManager;
 import net.maritimecloud.net.MaritimeCloudClientConfiguration;
 import net.maritimecloud.net.MaritimeCloudConnection;
+import net.maritimecloud.util.function.Consumer;
 
 import org.picocontainer.Startable;
 import org.slf4j.Logger;
@@ -64,14 +65,23 @@ public class ConnectionManager implements MaritimeCloudConnection, Startable {
     /** The URI to connect to. Is constant. */
     final URI uri;
 
-    public ConnectionManager(ClientContainer client, ThreadManager threadManager, MaritimeCloudClientConfiguration b) {
+    final ConnectionTransportManager ctm;
+
+    public ConnectionManager(ConnectionTransportManager ctm, ClientContainer client, ThreadManager threadManager,
+            MaritimeCloudClientConfiguration b) {
+        this.ctm = requireNonNull(ctm);
         this.client = client;
         this.threadManager = threadManager;
         for (MaritimeCloudConnection.Listener listener : b.getListeners()) {
-            addListener(listener);
+            listeners.add(requireNonNull(listener));
         }
         try {
-            String remote = "ws://" + b.getHost();
+            String remote = b.getHost();
+            if (!remote.contains(":")) {
+                remote += ":43234";
+            }
+            remote = "ws://" + remote;
+
             // Tomcat does not automatically append a '/' to the host address
             if (!remote.endsWith("/")) {
                 remote += "/";
@@ -82,10 +92,21 @@ public class ConnectionManager implements MaritimeCloudConnection, Startable {
         }
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public final void addListener(MaritimeCloudConnection.Listener listener) {
-        listeners.add(requireNonNull(listener));
+    // /** {@inheritDoc} */
+    // @Override
+    // public final void addListener(MaritimeCloudConnection.Listener listener) {
+    // listeners.add(requireNonNull(listener));
+    // }
+
+
+    void forEachListener(Consumer<MaritimeCloudConnection.Listener> consumer) {
+        for (MaritimeCloudConnection.Listener l : listeners) {
+            try {
+                consumer.accept(l);
+            } catch (RuntimeException e) {
+                LOG.error("Could not execute listener", e);
+            }
+        }
     }
 
     /** {@inheritDoc} */
@@ -166,6 +187,7 @@ public class ConnectionManager implements MaritimeCloudConnection, Startable {
         lock.lock();
         try {
             for (;;) {
+
                 switch (this.state) {
                 case SHOULD_STAY_CONNECTED:
                     if (connection == null) {
@@ -183,7 +205,11 @@ public class ConnectionManager implements MaritimeCloudConnection, Startable {
                 case SHOULD_SHUTDOWN:
                 case SHUTDOWN: // should never be invoked, but no reason to check
                     if (connection != null) {
-                        connection.disconnect();
+                        if (connection.disconnect()) {
+                            this.state = State.SHUTDOWN;
+                            stateChange.signalAll();
+                            return;
+                        }
                     } else {
                         this.state = State.SHUTDOWN;
                         stateChange.signalAll();
@@ -202,34 +228,22 @@ public class ConnectionManager implements MaritimeCloudConnection, Startable {
     /** {@inheritDoc} */
     @Override
     public final void start() {
-        Thread thread = new Thread(new Runnable() {
-
+        threadManager.startConnectingManager(new Runnable() {
             public void run() {
                 try {
                     mainThread();
-                } catch (Throwable t) {
+                } catch (RuntimeException | Error t) {
                     LOG.error("Something went wrong", t);
                     throw t;
                 }
             }
         });
-        thread.setDaemon(true);
-        thread.start();
     }
 
     /** {@inheritDoc} */
     @Override
     public final void stop() {
         // First shutdown the websocket
-        // WebSocketContainer container = this.container;
-        // if (container != null) {
-        // try {
-        // ((ContainerLifeCycle) container).stop();
-        // } catch (Exception e) {
-        // LOG.error("Failed to close websocket container", e);
-        // }
-        // }
-
         lock.lock();
         try {
             for (;;) {
@@ -241,7 +255,7 @@ public class ConnectionManager implements MaritimeCloudConnection, Startable {
                     stateChange.signalAll();
                 }
                 try {
-                    stateChange.await(10, TimeUnit.SECONDS);
+                    stateChange.await();
                 } catch (InterruptedException e) {
                     LOG.error("Thread interrupted", e);
                 }

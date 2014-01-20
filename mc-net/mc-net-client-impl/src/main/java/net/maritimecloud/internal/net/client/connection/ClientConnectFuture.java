@@ -28,6 +28,7 @@ import net.maritimecloud.internal.net.messages.auxiliary.HelloMessage;
 import net.maritimecloud.internal.net.messages.auxiliary.WelcomeMessage;
 import net.maritimecloud.net.ClosingCode;
 import net.maritimecloud.net.MaritimeCloudConnection.Listener;
+import net.maritimecloud.util.function.Consumer;
 import net.maritimecloud.util.geometry.PositionTime;
 
 import org.slf4j.Logger;
@@ -49,7 +50,7 @@ class ClientConnectFuture implements Runnable {
 
     private final CountDownLatch cancelled = new CountDownLatch(1);
 
-    private final ClientTransport transport;
+    private final ConnectionTransport transport;
 
     private boolean receivedHelloMessage /* = false */;
 
@@ -61,13 +62,20 @@ class ClientConnectFuture implements Runnable {
     ClientConnectFuture(ClientConnection connection, long reconnectId) {
         this.connection = requireNonNull(connection);
         this.reconnectId = reconnectId;
-        transport = new JavaxWebsocketTransport(this, connection);
+        transport = connection.connectionManager.ctm.create(connection, this);
+        // transport = new ConnectionTransportJsr356(this, connection);
     }
 
     /** {@inheritDoc} */
     @Override
     public void run() {
-        ConnectionManager cm = connection.connectionManager;
+        final ConnectionManager cm = connection.connectionManager;
+        cm.forEachListener(new Consumer<Listener>() {
+            public void accept(Listener t) {
+                t.connecting(cm.uri);
+            }
+        });
+        LOG.info("Trying to connect to " + cm.uri);
         thread = Thread.currentThread();
         while (cancelled.getCount() > 0) {
             try {
@@ -98,8 +106,9 @@ class ClientConnectFuture implements Runnable {
                 ClientContainer client = connection.connectionManager.client;
                 PositionTime pt = client.readCurrentPosition();
                 String connectName = connection.connectionId == null ? "" : connection.connectionId;
-                transport.sendText(new HelloMessage(client.getLocalId(), "enavClient/1.0", connectName, reconnectId, pt
-                        .getLatitude(), pt.getLongitude()).toJSON());
+                transport.sendText(new HelloMessage(client.getLocalId(), connection.connectionManager.client
+                        .getClientConnectString(), connectName, reconnectId, pt.getLatitude(), pt.getLongitude())
+                        .toJSON());
                 receivedHelloMessage = true;
             } else {
                 String err = "Expected a welcome message, but was: " + m.getClass().getSimpleName();
@@ -125,9 +134,12 @@ class ClientConnectFuture implements Runnable {
                 connection.worker.onConnect(transport, cm.getLastReceivedMessageId(), isReconnected);
                 // We need to retransmit messages
                 transport.connectFuture = null; // make sure we do not get any more messages
-                for (Listener l : connection.connectionManager.listeners) {
-                    l.connected();
-                }
+
+                connection.connectionManager.forEachListener(new Consumer<Listener>() {
+                    public void accept(Listener t) {
+                        t.connected();
+                    }
+                });
             } else {
                 String err = "Expected a connected message, but was: " + m.getClass().getSimpleName();
                 LOG.error(err);
@@ -142,7 +154,11 @@ class ClientConnectFuture implements Runnable {
         if (t != null) {
             t.interrupt();
             transport.doClose(ClosingCode.CONNECT_CANCELLED.withMessage("connect cancelled"));
-            t = null; // only invoke once
+            try {
+                t.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 }

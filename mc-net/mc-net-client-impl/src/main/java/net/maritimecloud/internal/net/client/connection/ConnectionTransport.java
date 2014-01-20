@@ -22,18 +22,23 @@ import java.net.URI;
 import net.maritimecloud.internal.net.messages.ConnectionMessage;
 import net.maritimecloud.internal.net.messages.TransportMessage;
 import net.maritimecloud.net.ClosingCode;
+import net.maritimecloud.net.MaritimeCloudConnection;
+import net.maritimecloud.net.MaritimeCloudConnection.Listener;
+import net.maritimecloud.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * The client implementation of a transport. Every time the client connects to a server a new transport is created.
+ * Unlike {@link ClientConnection} which will persist over multiple connects, and provide smooth reconnect.
  * 
  * @author Kasper Nielsen
  */
-public abstract class ClientTransport {
+abstract class ConnectionTransport {
 
     /** The logger. */
-    private static final Logger LOG = LoggerFactory.getLogger(ClientTransport.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ConnectionTransport.class);
 
     /** The connection that is using the transport. */
     final ClientConnection connection;
@@ -41,16 +46,20 @@ public abstract class ClientTransport {
     /** non-null while connecting. */
     ClientConnectFuture connectFuture;
 
-    ClientTransport(ClientConnectFuture connectFuture, ClientConnection connection) {
+    ConnectionTransport(ClientConnectFuture connectFuture, ClientConnection connection) {
         this.connectFuture = requireNonNull(connectFuture);
         this.connection = requireNonNull(connection);
     }
 
     abstract void doClose(final ClosingCode reason);
 
-    public void onTextMessage(String textMessage) {
+    public void onTextMessage(final String textMessage) {
         TransportMessage msg;
-        System.out.println("Received: " + textMessage);
+        connection.connectionManager.forEachListener(new Consumer<MaritimeCloudConnection.Listener>() {
+            public void accept(Listener t) {
+                t.messageReceived(textMessage);
+            }
+        });
         try {
             msg = TransportMessage.parseMessage(textMessage);
         } catch (Exception e) {
