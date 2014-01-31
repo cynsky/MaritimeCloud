@@ -18,7 +18,6 @@ package net.maritimecloud.broker.model;
 public class OperationalService {
     
     String name;
-    String description;
     
     public OperationalService() {
         
@@ -32,12 +31,4 @@ public class OperationalService {
         this.name = name;
     }
 
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-    
 }

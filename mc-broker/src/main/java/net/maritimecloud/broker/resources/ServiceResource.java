@@ -35,11 +35,7 @@ public class ServiceResource {
     public List<ServiceInstance> getAll() {
         List<ServiceInstance> list = new ArrayList<>();
         list.add(ExampleCreator.createMsiBaltic());
-        list.add(ExampleCreator.createMsiDk());
-        
         return list;
     }
-    
-    
 
 }

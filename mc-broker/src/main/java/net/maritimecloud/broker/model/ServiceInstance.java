@@ -8,9 +8,15 @@ import net.maritimecloud.broker.model.extent.ServiceExtent;
 
 public class ServiceInstance {
     
+    public enum ServiceType {
+        DYNAMIC, STATIC;
+    }
+    
     String provider;
+    String name;
     String description;
-    ServiceSpecificationVariant variant;
+    ServiceSpecification specification;
+    ServiceType type;
     ServiceExtent extent;
     List<ServiceEndpoint> endpoint = new ArrayList<>();
     
@@ -33,13 +39,21 @@ public class ServiceInstance {
     public void setDescription(String description) {
         this.description = description;
     }
-
-    public ServiceSpecificationVariant getVariant() {
-        return variant;
+    
+    public ServiceSpecification getSpecification() {
+        return specification;
     }
-
-    public void setVariant(ServiceSpecificationVariant variant) {
-        this.variant = variant;
+    
+    public void setSpecification(ServiceSpecification specification) {
+        this.specification = specification;
+    }
+    
+    public ServiceType getType() {
+        return type;
+    }
+    
+    public void setType(ServiceType type) {
+        this.type = type;
     }
 
     public ServiceExtent getExtent() {

@@ -20,7 +20,9 @@ public class ServiceSpecification {
 
     String serviceId;
     String version;
-    String description;
+    String variant;
+    String transport;
+    String description;    
     OperationalService operationalService;
 
     public ServiceSpecification() {
@@ -41,6 +43,22 @@ public class ServiceSpecification {
 
     public void setVersion(String version) {
         this.version = version;
+    }
+    
+    public String getVariant() {
+        return variant;
+    }
+    
+    public void setVariant(String variant) {
+        this.variant = variant;
+    }
+    
+    public String getTransport() {
+        return transport;
+    }
+    
+    public void setTransport(String transport) {
+        this.transport = transport;
     }
 
     public String getDescription() {
