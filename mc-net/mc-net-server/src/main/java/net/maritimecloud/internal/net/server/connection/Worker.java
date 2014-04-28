@@ -29,7 +29,7 @@ public class Worker implements Runnable {
 
     private final ReentrantLock receiveLock = new ReentrantLock();
 
-    private final ReentrantLock workLock = new ReentrantLock();
+    private final ReentrantLock workLock = new ReentrantLock(true);
 
     private final LinkedBlockingQueue<Object> q = new LinkedBlockingQueue<>();
 
@@ -110,7 +110,7 @@ public class Worker implements Runnable {
 
             workLock.lock();
             try {
-                sleepLong = wi.processNext();
+                sleepLong = !wi.processNext();
             } finally {
                 workLock.unlock();
             }
