@@ -25,11 +25,17 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>net.maritimecloud</groupId>
   <artifactId>mc-parent</artifactId>
-  <version>0.1.2-SNAPSHOT</version>
+  <version>0.1.2</version>
   <packaging>pom</packaging>
   <name>MaritimeCloud Parent</name>
   <description>MaritimeCloud Parent Module</description>
-
+<distributionManagement>
+  <repository>
+      <id>dma-release-repository</id>
+      <name>DMA cloudbees Releases</name>
+      <url>dav:https://repository-dma.forge.cloudbees.com/release/</url>
+    </repository>
+  </distributionManagement>
   <scm>
     <connection>scm:git:git@github.com:MaritimeCloud/MaritimeCloud.git</connection>
     <developerConnection>scm:git:git@github.com:MaritimeCloud/MaritimeCloud.git</developerConnection>

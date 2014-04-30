@@ -20,7 +20,7 @@
   <parent>
     <groupId>net.maritimecloud</groupId>
     <artifactId>mc-net-parent</artifactId>
-    <version>0.1.2-SNAPSHOT</version>
+    <version>0.1.2</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
